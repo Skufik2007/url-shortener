@@ -68,7 +68,7 @@ docker compose up -d --build
 | `AUTH_SECRET` | пусто | секрет подписи токенов; обязателен при заданном `DATABASE_URL` |
 | `TOKEN_TTL` | `72h` | срок жизни токена |
 | `GEOIP_DB` | пусто | путь к базе MaxMind GeoLite2 (`.mmdb`) |
-| `TRUST_PROXY` | `false` | доверять `X-Forwarded-For` / `X-Real-IP` (только за обратным прокси) |
+| `TRUST_PROXY` | `false` | доверять `X-Forwarded-For` и `CF-IPCountry` (только за обратным прокси) |
 | `CODE_LENGTH` | `7` | длина генерируемого кода (4–32) |
 | `ANALYTICS_WORKERS` | `4` | число воркеров аналитики |
 | `ANALYTICS_BUFFER` | `10000` | размер очереди событий |
