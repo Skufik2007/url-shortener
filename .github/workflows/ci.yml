@@ -92,7 +92,14 @@ jobs:
           check-latest: true
 
       - name: gosec
-        run: go run github.com/securego/gosec/v2/cmd/gosec@latest ./...
+        # gosec@latest зависит от x/tools, не читающего формат экспорта Go 1.27;
+        # собираем его с последней x/tools во временном модуле.
+        run: |
+          mkdir -p "$RUNNER_TEMP/gosec" && cd "$RUNNER_TEMP/gosec"
+          go mod init gosecbuild
+          go get github.com/securego/gosec/v2/cmd/gosec@latest golang.org/x/tools@latest
+          go build -o "$RUNNER_TEMP/gosec/gosec" github.com/securego/gosec/v2/cmd/gosec
+          cd "$GITHUB_WORKSPACE" && "$RUNNER_TEMP/gosec/gosec" ./...
 
       - name: govulncheck
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
