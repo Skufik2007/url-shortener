@@ -2,6 +2,8 @@ module github.com/Skufik2007/url-shortener
 
 go 1.27.1
 
+toolchain go1.27.2
+
 require (
 	github.com/alicebob/miniredis/v2 v2.40.0
 	github.com/jackc/pgx/v5 v5.11.0
