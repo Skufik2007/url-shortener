@@ -16,7 +16,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # 1.27.x + check-latest: всегда последний патч (go1.27.2+ закрывает уязвимости stdlib, найденные govulncheck)
+          # последний патч 1.27.x; минимальная версия задана директивой toolchain go1.27.2 в go.mod
           go-version: "1.27.x"
           check-latest: true
 
@@ -56,7 +56,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # 1.27.x + check-latest: всегда последний патч (go1.27.2+ закрывает уязвимости stdlib, найденные govulncheck)
+          # последний патч 1.27.x; минимальная версия задана директивой toolchain go1.27.2 в go.mod
           go-version: "1.27.x"
           check-latest: true
 
@@ -71,7 +71,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # 1.27.x + check-latest: всегда последний патч (go1.27.2+ закрывает уязвимости stdlib, найденные govulncheck)
+          # последний патч 1.27.x; минимальная версия задана директивой toolchain go1.27.2 в go.mod
           go-version: "1.27.x"
           check-latest: true
 
@@ -87,7 +87,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          # 1.27.x + check-latest: всегда последний патч (go1.27.2+ закрывает уязвимости stdlib, найденные govulncheck)
+          # последний патч 1.27.x; минимальная версия задана директивой toolchain go1.27.2 в go.mod
           go-version: "1.27.x"
           check-latest: true
 
