@@ -1,0 +1,22 @@
+# Бинарники и результаты сборки
+/shortener
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+bin/
+
+# Покрытие тестов
+coverage.out
+coverage.html
+
+# Локальные секреты и настройки
+.env
+
+# Данные GeoIP (MaxMind GeoLite2)
+*.mmdb
+
+# IDE
+.idea/
+.vscode/
