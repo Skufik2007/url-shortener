@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Сократитель ссылок</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="logo" aria-hidden="true">⌁</span> Сократитель</div>
+    <div id="userbox" class="userbox" hidden>
+      <span id="useremail" class="muted"></span>
+      <button id="logout" class="btn btn-ghost" type="button">Выйти</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Вход / регистрация -->
+    <section id="auth-view" class="card auth" hidden>
+      <h1>Личный кабинет</h1>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" id="tab-login" class="tab active" aria-selected="true">Вход</button>
+        <button type="button" role="tab" id="tab-register" class="tab" aria-selected="false">Регистрация</button>
+      </div>
+      <form id="auth-form" novalidate>
+        <label>Email
+          <input id="auth-email" type="email" autocomplete="email" required placeholder="you@example.com">
+        </label>
+        <label>Пароль
+          <input id="auth-password" type="password" autocomplete="current-password" required minlength="8" placeholder="не короче 8 символов">
+        </label>
+        <p id="auth-error" class="error" role="alert" hidden></p>
+        <button id="auth-submit" class="btn btn-primary" type="submit">Войти</button>
+      </form>
+    </section>
+
+    <!-- Основной экран -->
+    <div id="app-view" hidden>
+      <section class="card">
+        <h2>Новая ссылка</h2>
+        <form id="create-form" class="create-grid" novalidate>
+          <label class="span-2">Адрес (URL)
+            <input id="f-url" type="url" required placeholder="https://example.com/длинная/ссылка">
+          </label>
+          <label>Свой алиас <span class="muted">(необязательно)</span>
+            <input id="f-alias" type="text" maxlength="32" placeholder="my-link" autocomplete="off">
+          </label>
+          <label>Заголовок <span class="muted">(необязательно)</span>
+            <input id="f-title" type="text" maxlength="200" placeholder="Название для себя">
+          </label>
+          <label>Действует до <span class="muted">(необязательно)</span>
+            <input id="f-expires" type="datetime-local">
+          </label>
+          <div class="create-actions">
+            <button class="btn btn-primary" type="submit">Сократить</button>
+          </div>
+        </form>
+        <p id="create-error" class="error" role="alert" hidden></p>
+        <p id="create-ok" class="ok" role="status" hidden></p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Мои ссылки</h2>
+          <button id="refresh" class="btn btn-ghost" type="button">Обновить</button>
+        </div>
+        <div class="table-wrap">
+          <table id="links-table">
+            <thead>
+              <tr><th>Короткая ссылка</th><th>Назначение</th><th class="num">Переходы</th><th>Создана</th><th></th></tr>
+            </thead>
+            <tbody id="links-body"></tbody>
+          </table>
+        </div>
+        <p id="links-empty" class="muted center" hidden>Пока нет ссылок — создайте первую выше.</p>
+      </section>
+
+      <section id="stats-card" class="card" hidden>
+        <div class="card-head">
+          <h2>Статистика: <span id="stats-code" class="mono"></span></h2>
+          <div class="period">
+            <label>С <input id="p-from" type="date"></label>
+            <label>По <input id="p-to" type="date"></label>
+            <button id="p-apply" class="btn" type="button">Показать</button>
+          </div>
+        </div>
+        <div class="presets">
+          <button class="chip" type="button" data-days="7">7 дней</button>
+          <button class="chip" type="button" data-days="30">30 дней</button>
+          <button class="chip" type="button" data-days="90">90 дней</button>
+        </div>
+        <p id="stats-error" class="error" role="alert" hidden></p>
+        <div class="totals">
+          <div class="total"><div class="total-n" id="t-clicks">0</div><div class="muted">переходов</div></div>
+          <div class="total"><div class="total-n" id="t-unique">0</div><div class="muted">уникальных посетителей</div></div>
+        </div>
+        <h3>Переходы по дням</h3>
+        <div id="chart" class="chart"></div>
+        <div class="tops">
+          <div><h3>Страны</h3><div id="top-country"></div></div>
+          <div><h3>Источники</h3><div id="top-referrer"></div></div>
+          <div><h3>Браузеры</h3><div id="top-browser"></div></div>
+          <div><h3>ОС</h3><div id="top-os"></div></div>
+          <div><h3>Устройства</h3><div id="top-device"></div></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

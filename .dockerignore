@@ -1,0 +1,19 @@
+# Контекст сборки: только то, что нужно для go build
+
+.git
+.github
+.idea
+.vscode
+.env
+bin
+coverage.out
+coverage.html
+*.mmdb
+*.test
+*.exe
+docs
+Dockerfile
+docker-compose.yml
+.dockerignore
+.gitignore
+Makefile
