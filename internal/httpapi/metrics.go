@@ -21,7 +21,8 @@ type Metrics struct {
 	RedirectGone    atomic.Uint64 // редиректы: ссылка истекла или удалена
 	RateLimited     atomic.Uint64 // отклонено ограничителем частоты
 	LinksCreated    atomic.Uint64
-	InFlight        atomic.Int64 // запросов в обработке сейчас
+	QRGenerated     atomic.Uint64 // выданные картинки QR-кодов
+	InFlight        atomic.Int64  // запросов в обработке сейчас
 }
 
 // NewMetrics создаёт пустой набор счётчиков.
@@ -41,6 +42,7 @@ func (m *Metrics) WritePrometheus(w io.Writer, stats func() CollectorStats) {
 	counter("shortener_redirects_gone_total", "Переходы по истёкшей или удалённой ссылке.", m.RedirectGone.Load())
 	counter("shortener_rate_limited_total", "Запросы, отклонённые ограничителем частоты.", m.RateLimited.Load())
 	counter("shortener_links_created_total", "Созданные ссылки.", m.LinksCreated.Load())
+	counter("shortener_qr_generated_total", "Выданные изображения QR-кодов.", m.QRGenerated.Load())
 	_, _ = fmt.Fprintf(w, "# HELP shortener_http_in_flight Запросов в обработке.\n# TYPE shortener_http_in_flight gauge\nshortener_http_in_flight %d\n", m.InFlight.Load())
 
 	if stats != nil {
