@@ -240,8 +240,14 @@ func newEnv(t *testing.T, rps float64, burst int) *env {
 	return &env{srv: ts, store: store, tracker: tracker, metrics: m, health: &down}
 }
 
+// result — то, что тестам нужно от ответа; тело уже прочитано и закрыто в do.
+type result struct {
+	StatusCode int
+	Header     http.Header
+}
+
 // do выполняет запрос без следования редиректам.
-func (e *env) do(t *testing.T, method, path, token string, body any) (*http.Response, []byte) {
+func (e *env) do(t *testing.T, method, path, token string, body any) (*result, []byte) {
 	t.Helper()
 	var rd io.Reader
 	if body != nil {
@@ -266,9 +272,11 @@ func (e *env) do(t *testing.T, method, path, token string, body any) (*http.Resp
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer resp.Body.Close()
 	data, _ := io.ReadAll(resp.Body)
-	return resp, data
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return &result{StatusCode: resp.StatusCode, Header: resp.Header}, data
 }
 
 func (e *env) register(t *testing.T, email string) string {
@@ -282,7 +290,7 @@ func (e *env) register(t *testing.T, email string) string {
 	return out.Token
 }
 
-func wantStatus(t *testing.T, resp *http.Response, body []byte, want int) {
+func wantStatus(t *testing.T, resp *result, body []byte, want int) {
 	t.Helper()
 	if resp.StatusCode != want {
 		t.Fatalf("статус %d, ожидался %d; тело: %s", resp.StatusCode, want, body)
@@ -384,7 +392,9 @@ func TestRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "https://example.com/x?y=1" {
 		t.Fatalf("статус %d, Location %q", resp.StatusCode, resp.Header.Get("Location"))
 	}
@@ -516,7 +526,7 @@ func TestUnauthorized(t *testing.T) {
 
 func TestRateLimit(t *testing.T) {
 	e := newEnv(t, 0.001, 3)
-	var last *http.Response
+	var last *result
 	var codes []int
 	for i := 0; i < 5; i++ {
 		resp, _ := e.do(t, "POST", "/api/v1/auth/login", "", map[string]string{"email": "a@b.co", "password": "xxxxxxxx"})

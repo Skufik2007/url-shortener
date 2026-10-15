@@ -29,6 +29,7 @@ lint:
 
 # Требует установленных gosec и govulncheck:
 #   go install github.com/securego/gosec/v2/cmd/gosec@latest
+#   (для Go 1.27 gosec нужно собрать с последней golang.org/x/tools — см. задание security в .github/workflows/ci.yml)
 #   go install golang.org/x/vuln/cmd/govulncheck@latest
 sec:
 	gosec ./...
