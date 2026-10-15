@@ -95,7 +95,9 @@ func (r *RedisCache) TopCodes(ctx context.Context, n int) ([]string, error) {
 	if n <= 0 {
 		return nil, nil
 	}
-	return r.c.ZRevRange(ctx, popularKey, 0, int64(n-1)).Result()
+	return r.c.ZRangeArgs(ctx, redis.ZRangeArgs{
+		Key: popularKey, Start: 0, Stop: int64(n - 1), Rev: true,
+	}).Result()
 }
 
 // Ping проверяет соединение.

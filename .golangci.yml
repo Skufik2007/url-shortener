@@ -27,7 +27,8 @@ linters:
         - name: receiver-naming
         - name: superfluous-else
         - name: unreachable-code
-        - name: unused-parameter
+        # unused-parameter не включён: методы, реализующие интерфейсы (storage.Store,
+        # http.HandlerFunc), обязаны принимать ctx / *http.Request, даже если не используют их.
         - name: var-naming
   exclusions:
     generated: lax
@@ -35,6 +36,11 @@ linters:
       - path: '_test\.go$'
         linters:
           - gosec
+
+issues:
+  # показывать все замечания, а не первые три каждого вида
+  max-issues-per-linter: 0
+  max-same-issues: 0
 
 formatters:
   enable:
