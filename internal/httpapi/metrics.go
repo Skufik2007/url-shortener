@@ -29,9 +29,10 @@ func NewMetrics() *Metrics { return &Metrics{} }
 
 // WritePrometheus выводит счётчики в текстовом формате Prometheus.
 // stats может быть nil.
+// Ошибки записи игнорируются намеренно: они означают, что клиент закрыл соединение.
 func (m *Metrics) WritePrometheus(w io.Writer, stats func() CollectorStats) {
 	counter := func(name, help string, v uint64) {
-		fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s counter\n%s %d\n", name, help, name, name, v)
+		_, _ = fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s counter\n%s %d\n", name, help, name, name, v)
 	}
 	counter("shortener_http_requests_total", "Всего HTTP-запросов.", m.Requests.Load())
 	counter("shortener_http_responses_5xx_total", "Ответы с ошибкой сервера.", m.Responses5xx.Load())
@@ -40,7 +41,7 @@ func (m *Metrics) WritePrometheus(w io.Writer, stats func() CollectorStats) {
 	counter("shortener_redirects_gone_total", "Переходы по истёкшей или удалённой ссылке.", m.RedirectGone.Load())
 	counter("shortener_rate_limited_total", "Запросы, отклонённые ограничителем частоты.", m.RateLimited.Load())
 	counter("shortener_links_created_total", "Созданные ссылки.", m.LinksCreated.Load())
-	fmt.Fprintf(w, "# HELP shortener_http_in_flight Запросов в обработке.\n# TYPE shortener_http_in_flight gauge\nshortener_http_in_flight %d\n", m.InFlight.Load())
+	_, _ = fmt.Fprintf(w, "# HELP shortener_http_in_flight Запросов в обработке.\n# TYPE shortener_http_in_flight gauge\nshortener_http_in_flight %d\n", m.InFlight.Load())
 
 	if stats != nil {
 		s := stats()
