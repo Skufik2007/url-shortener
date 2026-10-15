@@ -758,3 +758,61 @@ func TestTopLinks(t *testing.T) {
 		t.Errorf("TopLinks = %v", top)
 	}
 }
+
+func TestCheckActive(t *testing.T) {
+	ctx := context.Background()
+	e := newEnv(t)
+	e.createLink(t, 1, "live001", nil)
+	e.createLink(t, 1, "dead001", nil)
+	if err := e.svc.Delete(ctx, 1, "dead001"); err != nil {
+		t.Fatal(err)
+	}
+	e.createLink(t, 1, "exp0001", timePtr(baseTime.Add(time.Hour)))
+	// Закэшированная ссылка, срок которой истечёт.
+	e.createLink(t, 1, "hot0001", timePtr(baseTime.Add(2*time.Hour)))
+	for i := 0; i < 3; i++ {
+		if _, err := e.svc.Resolve(ctx, "hot0001", Visit{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	eventsBefore := len(e.tracker.events)
+
+	tests := []struct {
+		name    string
+		code    string
+		shift   time.Duration
+		failGet bool
+		want    error
+	}{
+		{"активная ссылка", "live001", 0, false, nil},
+		{"несуществующая", "nope123", 0, false, ErrNotFound},
+		{"недопустимый код", "a/b", 0, false, ErrNotFound},
+		{"удалённая", "dead001", 0, false, ErrGone},
+		{"ещё не истекла", "exp0001", 30 * time.Minute, false, nil},
+		{"истекла", "exp0001", time.Hour, false, ErrGone},
+		{"из кэша, активная", "hot0001", 0, false, nil},
+		{"из кэша, истекла", "hot0001", 3 * time.Hour, false, ErrGone},
+		{"кэш недоступен — читаем из БД", "live001", 0, true, nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e.now = baseTime.Add(tc.shift)
+			e.cache.failGet = tc.failGet
+			defer func() { e.now, e.cache.failGet = baseTime, false }()
+			if err := e.svc.CheckActive(ctx, tc.code); !errors.Is(err, tc.want) {
+				t.Errorf("CheckActive(%q) = %v, ожидалось %v", tc.code, err, tc.want)
+			}
+		})
+	}
+	if len(e.tracker.events) != eventsBefore {
+		t.Errorf("CheckActive не должен попадать в аналитику: было %d событий, стало %d", eventsBefore, len(e.tracker.events))
+	}
+}
+
+func TestCheckActive_StoreError(t *testing.T) {
+	s := New(errStore{memory.New()}, cache.NewMemory(), &seqGen{}, &fakeTracker{}, DefaultOptions(),
+		slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err := s.CheckActive(context.Background(), "abc1234"); !errors.Is(err, errStoreBoom) {
+		t.Fatalf("ожидалась ошибка хранилища, получено %v", err)
+	}
+}
