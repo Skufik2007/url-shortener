@@ -203,9 +203,13 @@
       var actions = el("td", { "class": "actions" });
       var stat = el("button", { "class": "btn btn-sm", type: "button", text: "Статистика" });
       stat.addEventListener("click", function () { selectLink(l.code); });
+      var qr = el("button", { "class": "btn btn-sm", type: "button", text: "QR", "aria-label": "QR-код для " + l.short_url });
+      qr.addEventListener("click", function () { openQr(l, qr); });
       var del = el("button", { "class": "btn btn-sm btn-danger", type: "button", text: "Удалить" });
       del.addEventListener("click", function () { removeLink(l.code); });
       actions.appendChild(stat);
+      actions.appendChild(document.createTextNode(" "));
+      actions.appendChild(qr);
       actions.appendChild(document.createTextNode(" "));
       actions.appendChild(del);
 
@@ -248,6 +252,67 @@
       toast("Ссылка удалена");
       return loadLinks();
     }).catch(function (e) { toast(e.message); });
+  }
+
+  // ---- QR-код ----
+  var qrModal = null;
+
+  function closeQr() {
+    if (!qrModal) return;
+    var m = qrModal;
+    qrModal = null;
+    document.removeEventListener("keydown", m.onKey, true);
+    if (m.root.parentNode) m.root.parentNode.removeChild(m.root);
+    if (m.opener && document.body.contains(m.opener)) m.opener.focus();
+  }
+
+  function openQr(link, opener) {
+    closeQr();
+    var code = encodeURIComponent(link.code);
+    var title = el("h2", { id: "qr-title", text: "QR-код" });
+    var shortText = el("p", { "class": "qr-url mono", text: link.short_url });
+    var img = el("img", {
+      "class": "qr-img", width: "256", height: "256",
+      src: "/qr/" + code + ".png?size=512", alt: "QR-код для " + link.short_url
+    });
+    var fail = el("p", { "class": "error qr-fail", text: "Не удалось получить QR-код" });
+    fail.hidden = true;
+    img.addEventListener("error", function () { show(img, false); show(fail, true); });
+    var download = el("a", {
+      "class": "btn btn-primary", href: "/qr/" + code + ".png?size=1024",
+      download: "qr-" + link.code + ".png", text: "Скачать PNG"
+    });
+    var closeBtn = el("button", { "class": "btn", type: "button", text: "Закрыть" });
+    closeBtn.addEventListener("click", closeQr);
+    var hint = el("p", { "class": "qr-hint muted", text: "Отсканируйте камерой телефона. Чтобы ссылка открылась на телефоне, запускайте сервис через «Запустить для телефона.bat»." });
+
+    var dialog = el("div", {
+      "class": "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "qr-title", tabindex: "-1"
+    }, [
+      title, shortText,
+      el("div", { "class": "qr-box" }, [img, fail]),
+      el("div", { "class": "qr-actions" }, [download, closeBtn]),
+      hint
+    ]);
+    var root = el("div", { "class": "modal-backdrop" }, [dialog]);
+    root.addEventListener("click", function (ev) { if (ev.target === root) closeQr(); });
+
+    function onKey(ev) {
+      if (ev.key === "Escape") { ev.preventDefault(); closeQr(); return; }
+      if (ev.key !== "Tab") return;
+      var f = dialog.querySelectorAll("a[href], button");
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (ev.shiftKey && (document.activeElement === first || document.activeElement === dialog)) {
+        ev.preventDefault(); last.focus();
+      } else if (!ev.shiftKey && document.activeElement === last) {
+        ev.preventDefault(); first.focus();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    qrModal = { root: root, onKey: onKey, opener: opener };
+    document.body.appendChild(root);
+    dialog.focus();
   }
 
   // ---- статистика ----

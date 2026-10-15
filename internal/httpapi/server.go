@@ -90,6 +90,9 @@ func NewServer(deps Deps) http.Handler {
 	mux.HandleFunc("GET /api/v1/links/{code}/stats", s.authed(s.handleStats))
 	mux.HandleFunc("GET /api/v1/top", s.handleTop)
 
+	// QR-код короткой ссылки (PNG).
+	mux.HandleFunc("GET /qr/{file}", s.handleQR)
+
 	// Дашборд.
 	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/dashboard/", http.StatusFound)

@@ -159,6 +159,27 @@ td.actions { white-space: nowrap; text-align: right; }
   font-size: .85rem; box-shadow: var(--shadow); z-index: 10;
 }
 
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  padding: 16px; background: rgba(10, 14, 25, .55); overflow-y: auto;
+}
+.modal {
+  width: 100%; max-width: 360px; max-height: 100%; overflow-y: auto; text-align: center;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: 0 8px 32px rgba(0, 0, 0, .35); padding: 20px;
+}
+.modal:focus { outline: none; }
+.modal h2 { margin-bottom: .3em; }
+.qr-url { margin: 0 0 14px; font-size: .85rem; color: var(--muted); word-break: break-all; }
+.qr-box { display: flex; align-items: center; justify-content: center; min-height: 100px; margin-bottom: 14px; }
+.qr-img {
+  display: block; width: 256px; max-width: 100%; height: auto; aspect-ratio: 1;
+  background: #fff; border-radius: 8px; box-shadow: 0 0 0 1px var(--border);
+}
+.qr-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.qr-actions a.btn { text-decoration: none; }
+.qr-hint { margin: 14px 0 0; font-size: .78rem; }
+
 @media (max-width: 600px) {
   .container { padding: 12px 16px 40px; }
   .card { padding: 16px; }
