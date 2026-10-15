@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -64,5 +66,71 @@ func TestInvalidValues(t *testing.T) {
 		if !strings.Contains(err.Error(), k) {
 			t.Errorf("в ошибке нет %s: %v", k, err)
 		}
+	}
+}
+
+// DATA_FILE без AUTH_SECRET: секрет создаётся в файле один раз и переживает перезапуск.
+func TestDataFileSecretPersists(t *testing.T) {
+	dataFile := filepath.Join(t.TempDir(), "data.json")
+	c1, err := LoadFrom(env(map[string]string{"DATA_FILE": dataFile}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c1.DataFile != dataFile || c1.SecretFile != dataFile+".secret" || c1.GeneratedSecret {
+		t.Fatalf("неожиданная конфигурация: %+v", c1)
+	}
+	if len(c1.AuthSecret) < minSecretLen {
+		t.Fatalf("секрет слишком короткий: %d", len(c1.AuthSecret))
+	}
+	info, err := os.Stat(c1.SecretFile)
+	if err != nil {
+		t.Fatalf("файл секрета не создан: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("файл секрета пуст")
+	}
+
+	c2, err := LoadFrom(env(map[string]string{"DATA_FILE": dataFile}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c2.AuthSecret != c1.AuthSecret {
+		t.Fatal("после «перезапуска» секрет изменился — токены перестали бы действовать")
+	}
+
+	// Явный AUTH_SECRET важнее файла.
+	explicit := strings.Repeat("e", 40)
+	c3, err := LoadFrom(env(map[string]string{"DATA_FILE": dataFile, "AUTH_SECRET": explicit}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c3.AuthSecret != explicit || c3.SecretFile != "" {
+		t.Fatalf("AUTH_SECRET должен иметь приоритет: %+v", c3)
+	}
+}
+
+func TestDataFileErrors(t *testing.T) {
+	dir := t.TempDir()
+
+	// DATA_FILE вместе с DATABASE_URL — противоречивая настройка.
+	_, err := LoadFrom(env(map[string]string{
+		"DATA_FILE": filepath.Join(dir, "d.json"), "DATABASE_URL": "postgres://x", "AUTH_SECRET": strings.Repeat("s", 32),
+	}))
+	if err == nil || !strings.Contains(err.Error(), "DATA_FILE") {
+		t.Fatalf("ожидалась ошибка про DATA_FILE, получено %v", err)
+	}
+
+	// Слишком короткий секрет в файле.
+	short := filepath.Join(dir, "short.json")
+	if err := os.WriteFile(short+".secret", []byte("abc\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadFrom(env(map[string]string{"DATA_FILE": short})); err == nil || !strings.Contains(err.Error(), "короткий") {
+		t.Fatalf("ожидалась ошибка короткого секрета, получено %v", err)
+	}
+
+	// Каталога нет — секрет записать нельзя.
+	if _, err := LoadOrCreateSecret(filepath.Join(dir, "missing", "x.secret")); err == nil {
+		t.Fatal("ожидалась ошибка записи секрета")
 	}
 }

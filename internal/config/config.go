@@ -6,9 +6,11 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -23,9 +25,13 @@ type Config struct {
 	BaseURL     string // без завершающего «/»
 	DatabaseURL string // пусто — хранилище в памяти
 	RedisURL    string // пусто — кэш в памяти
+	// DataFile — файл снимка для хранилища в памяти (только без DATABASE_URL);
+	// пусто — данные живут до остановки процесса.
+	DataFile string
 
 	AuthSecret      string
-	GeneratedSecret bool // секрет сгенерирован автоматически (демо-режим)
+	GeneratedSecret bool   // секрет сгенерирован автоматически (демо-режим)
+	SecretFile      string // файл, из которого прочитан или в который записан секрет (демо-режим с DATA_FILE)
 	TokenTTL        time.Duration
 
 	GeoIPDB    string
@@ -88,6 +94,7 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		BaseURL:          strings.TrimRight(str("BASE_URL", "http://localhost:8080"), "/"),
 		DatabaseURL:      str("DATABASE_URL", ""),
 		RedisURL:         str("REDIS_URL", ""),
+		DataFile:         str("DATA_FILE", ""),
 		AuthSecret:       getenv("AUTH_SECRET"),
 		TokenTTL:         duration("TOKEN_TTL", 72*time.Hour),
 		GeoIPDB:          str("GEOIP_DB", ""),
@@ -128,8 +135,21 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		errs = append(errs, err)
 	}
 
+	if c.DataFile != "" && c.DatabaseURL != "" {
+		errs = append(errs, errors.New("DATA_FILE используется только без DATABASE_URL (данные хранятся в PostgreSQL)"))
+	}
+
 	// Секрет подписи токенов.
 	switch {
+	case c.AuthSecret == "" && c.DatabaseURL == "" && c.DataFile != "":
+		// Демо-режим с сохранением данных: секрет тоже должен пережить перезапуск,
+		// иначе выданные токены станут недействительными.
+		c.SecretFile = c.DataFile + ".secret"
+		secret, err := LoadOrCreateSecret(c.SecretFile)
+		if err != nil {
+			errs = append(errs, err)
+		}
+		c.AuthSecret = secret
 	case c.AuthSecret == "" && c.DatabaseURL == "":
 		// Демо-режим: данные всё равно не переживут перезапуск, токены тоже.
 		buf := make([]byte, 48)
@@ -148,6 +168,32 @@ func LoadFrom(getenv func(string) string) (Config, error) {
 		return Config{}, errors.Join(errs...)
 	}
 	return c, nil
+}
+
+// LoadOrCreateSecret читает секрет подписи токенов из файла path, а если файла нет —
+// генерирует случайный секрет и сохраняет его (права 0600: только владелец).
+func LoadOrCreateSecret(path string) (string, error) {
+	path = filepath.Clean(path) // путь строится из DATA_FILE, заданного администратором
+	data, err := os.ReadFile(path)
+	if err == nil {
+		secret := strings.TrimSpace(string(data))
+		if len(secret) < minSecretLen {
+			return "", fmt.Errorf("секрет в %s слишком короткий: %d байт, нужно не меньше %d", path, len(secret), minSecretLen)
+		}
+		return secret, nil
+	}
+	if !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("чтение секрета %s: %w", path, err)
+	}
+	buf := make([]byte, 48)
+	if _, err := rand.Read(buf); err != nil {
+		return "", fmt.Errorf("генерация секрета: %w", err)
+	}
+	secret := base64.RawURLEncoding.EncodeToString(buf)
+	if err := os.WriteFile(path, []byte(secret+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("запись секрета %s: %w", path, err)
+	}
+	return secret, nil
 }
 
 // ParseLevel переводит текстовый уровень логирования в slog.Level.

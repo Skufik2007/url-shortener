@@ -28,6 +28,22 @@ type Store struct {
 	users      map[int64]*model.User
 	userByMail map[string]int64
 	clicks     map[int64][]model.Click // linkID -> переходы
+
+	// version растёт при каждом изменении данных; changed (если задан) получает
+	// неблокирующее уведомление — его слушает фоновое сохранение в файл (Persistent).
+	version uint64
+	changed chan struct{}
+}
+
+// touch отмечает изменение данных. Вызывается под s.mu.Lock().
+func (s *Store) touch() {
+	s.version++
+	if s.changed != nil {
+		select {
+		case s.changed <- struct{}{}:
+		default: // уведомление уже ожидает обработки
+		}
+	}
 }
 
 // New создаёт пустое хранилище.
@@ -54,6 +70,7 @@ func (s *Store) Create(ctx context.Context, l *model.Link) error {
 	cp := *l
 	s.links[l.ID] = &cp
 	s.linkByCode[l.Code] = l.ID
+	s.touch()
 	return nil
 }
 
@@ -108,6 +125,7 @@ func (s *Store) Deactivate(ctx context.Context, ownerID int64, code string) erro
 		return storage.ErrNotFound
 	}
 	s.links[id].IsActive = false
+	s.touch()
 	return nil
 }
 
@@ -119,6 +137,9 @@ func (s *Store) AddClicks(ctx context.Context, deltas map[int64]int64) error {
 		if l, ok := s.links[id]; ok {
 			l.ClickCount += d
 		}
+	}
+	if len(deltas) > 0 {
+		s.touch()
 	}
 	return nil
 }
@@ -137,6 +158,7 @@ func (s *Store) CreateUser(ctx context.Context, u *model.User) error {
 	cp := *u
 	s.users[u.ID] = &cp
 	s.userByMail[key] = u.ID
+	s.touch()
 	return nil
 }
 
@@ -172,6 +194,9 @@ func (s *Store) InsertBatch(ctx context.Context, clicks []model.Click) error {
 		s.nextClickID++
 		c.ID = s.nextClickID
 		s.clicks[c.LinkID] = append(s.clicks[c.LinkID], c)
+	}
+	if len(clicks) > 0 {
+		s.touch()
 	}
 	return nil
 }

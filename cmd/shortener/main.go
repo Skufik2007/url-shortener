@@ -31,6 +31,8 @@ import (
 const (
 	bcryptCost      = 12
 	shutdownTimeout = 15 * time.Second
+	// dataSaveDebounce — задержка перед записью снимка после изменения данных (DATA_FILE).
+	dataSaveDebounce = 500 * time.Millisecond
 )
 
 func main() {
@@ -49,7 +51,10 @@ func run() error {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
 	slog.SetDefault(log)
 
-	if cfg.GeneratedSecret {
+	switch {
+	case cfg.SecretFile != "":
+		log.Info("AUTH_SECRET не задан: секрет подписи токенов хранится в файле", "path", cfg.SecretFile)
+	case cfg.GeneratedSecret:
 		log.Warn("AUTH_SECRET не задан: сгенерирован случайный секрет, токены перестанут действовать после перезапуска (демо-режим)")
 	}
 
@@ -58,16 +63,24 @@ func run() error {
 
 	// Хранилище.
 	var store storage.Store
-	if cfg.DatabaseURL != "" {
+	switch {
+	case cfg.DatabaseURL != "":
 		pg, err := postgres.New(ctx, cfg.DatabaseURL)
 		if err != nil {
 			return fmt.Errorf("postgres: %w", err)
 		}
 		store = pg
 		log.Info("хранилище: PostgreSQL")
-	} else {
+	case cfg.DataFile != "":
+		ps, err := memory.Open(cfg.DataFile, dataSaveDebounce, log)
+		if err != nil {
+			return fmt.Errorf("хранилище в файле: %w", err)
+		}
+		store = ps
+		log.Info("хранилище: память с сохранением в файл", "path", cfg.DataFile)
+	default:
 		store = memory.New()
-		log.Warn("хранилище: память (DATABASE_URL не задан), данные пропадут при остановке")
+		log.Warn("хранилище: память (DATABASE_URL и DATA_FILE не заданы), данные пропадут при остановке")
 	}
 	defer closeQuietly(log, "store", store.Close)
 
