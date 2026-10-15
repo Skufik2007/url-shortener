@@ -11,6 +11,7 @@ import (
 
 	"github.com/Skufik2007/url-shortener/internal/auth"
 	"github.com/Skufik2007/url-shortener/internal/model"
+	"github.com/Skufik2007/url-shortener/internal/qrcode"
 	"github.com/Skufik2007/url-shortener/internal/service"
 )
 
@@ -322,6 +323,43 @@ func (s *server) handleRedirect(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "private, max-age=0")
 	w.Header().Set("Location", target)
 	w.WriteHeader(http.StatusFound)
+}
+
+// ---- QR-код ----
+
+// handleQR отдаёт PNG с QR-кодом короткой ссылки: GET /qr/{code}.png?size=256.
+// Адрес публичный: в QR зашита только короткая ссылка, которая и так открыта.
+func (s *server) handleQR(w http.ResponseWriter, r *http.Request) {
+	code, ok := strings.CutSuffix(r.PathValue("file"), ".png")
+	if !ok {
+		writeError(w, http.StatusNotFound, "link not found")
+		return
+	}
+	size := qrcode.DefaultSize
+	if v := r.URL.Query().Get("size"); v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil || parsed < qrcode.MinSize || parsed > qrcode.MaxSize {
+			writeError(w, http.StatusBadRequest,
+				"size must be between "+strconv.Itoa(qrcode.MinSize)+" and "+strconv.Itoa(qrcode.MaxSize))
+			return
+		}
+		size = parsed
+	}
+	if err := s.Links.CheckActive(r.Context(), code); err != nil {
+		s.writeServiceError(w, r, err)
+		return
+	}
+	img, err := qrcode.PNG(s.BaseURL+"/"+code, size)
+	if err != nil {
+		s.writeServiceError(w, r, err)
+		return
+	}
+	s.Metrics.QRGenerated.Add(1)
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Length", strconv.Itoa(len(img)))
+	// Картинка зависит только от кода и размера, её можно кэшировать.
+	w.Header().Set("Cache-Control", "public, max-age=3600")
+	_, _ = w.Write(img)
 }
 
 // ---- служебные ----

@@ -245,6 +245,35 @@ func (s *LinkService) loadAndMaybeCache(ctx context.Context, code string) (*cach
 	return entry, nil
 }
 
+// CheckActive проверяет, что ссылка существует, активна и не истекла.
+// В отличие от Resolve, переход не учитывается в статистике и счётчик
+// популярности не меняется: метод используется для выдачи QR-кода.
+func (s *LinkService) CheckActive(ctx context.Context, code string) error {
+	if !shortcode.LooksValid(code) {
+		return ErrNotFound
+	}
+	now := s.now()
+	if entry, err := s.cache.Get(ctx, code); err == nil {
+		if entry.ExpiresAt != nil && !now.Before(*entry.ExpiresAt) {
+			return ErrGone
+		}
+		return nil
+	} else if !errors.Is(err, cache.ErrMiss) {
+		s.log.Warn("cache get failed", "err", err)
+	}
+	link, err := s.store.GetByCode(ctx, code)
+	if err != nil {
+		if errors.Is(err, storage.ErrNotFound) {
+			return ErrNotFound
+		}
+		return err
+	}
+	if !link.IsActive || link.Expired(now) {
+		return ErrGone
+	}
+	return nil
+}
+
 // List возвращает ссылки владельца.
 func (s *LinkService) List(ctx context.Context, ownerID int64, limit, offset int) ([]model.Link, error) {
 	if limit <= 0 || limit > 100 {
