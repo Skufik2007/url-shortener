@@ -14,7 +14,7 @@ Postgres-тесты помечаются build-тегом `integration`, Redis �
 |---|---|
 | `internal/model` | доменные сущности (User, Link, Click, LinkStats) — **готово** |
 | `internal/storage` | интерфейсы `Store`, ошибки `ErrNotFound`/`ErrConflict` — **готово** |
-| `internal/storage/memory` | потокобезопасная реализация `storage.Store` в памяти (sync.RWMutex) |
+| `internal/storage/memory` | потокобезопасная реализация `storage.Store` в памяти (`Store`, sync.RWMutex) и `Persistent` — обёртка над ней со снимком состояния в JSON-файле (`persist.go`) |
 | `internal/storage/postgres` | реализация на pgxpool + миграции (embed `migrations/*.sql`) |
 | `internal/cache` | интерфейс `LinkCache` — **готово**; `RedisCache`, `MemoryCache` |
 | `internal/shortcode` | генерация base62-кодов, валидация алиасов (контракт в shortcode.go) |
@@ -85,10 +85,23 @@ rate limiting (token bucket по IP) на `POST /links` и `/auth/*`, загол
 ## Конфигурация (env)
 
 `HTTP_ADDR` (`:8080`), `BASE_URL` (`http://localhost:8080`), `DATABASE_URL` (пусто → память),
-`REDIS_URL` (пусто → память), `AUTH_SECRET` (обязателен, если задан DATABASE_URL),
+`DATA_FILE` (пусто; файл снимка демо-режима, только без DATABASE_URL), `REDIS_URL` (пусто → память),
+`AUTH_SECRET` (обязателен, если задан DATABASE_URL; при заданном DATA_FILE хранится в `<DATA_FILE>.secret`),
 `TOKEN_TTL` (`72h`), `GEOIP_DB`, `TRUST_PROXY` (`false`), `CODE_LENGTH` (`7`),
 `ANALYTICS_WORKERS` (`4`), `ANALYTICS_BUFFER` (`10000`), `ANALYTICS_BATCH` (`500`),
 `ANALYTICS_FLUSH` (`1s`), `RATE_LIMIT_RPS` (`5`), `RATE_LIMIT_BURST` (`20`), `LOG_LEVEL` (`info`).
+
+## Режимы хранения
+
+Выбор делает `cmd/shortener` по конфигурации: (1) задан `DATABASE_URL` — PostgreSQL (продакшен);
+(2) не заданы ни `DATABASE_URL`, ни `DATA_FILE` — `memory.Store`, данные теряются при остановке;
+(3) задан `DATA_FILE` — `memory.Persistent`: при запуске снимок загружается из JSON-файла, после
+изменений (с задержкой debounce 500 мс) и при `Close()` записывается обратно атомарно (временный файл
+в том же каталоге, `Sync`, `Rename`). Изменения отслеживает счётчик версии в `memory.Store`; если версия
+не менялась, файл не трогается. Повреждённый файл — ошибка запуска, файл не перезаписывается.
+`DATA_FILE` вместе с `DATABASE_URL` — ошибка конфигурации. Секрет токенов при пустом `AUTH_SECRET`
+читается из `<DATA_FILE>.secret` или создаётся там (права 0600). Порядок остановки: HTTP-сервер →
+дренаж сборщика аналитики → закрытие хранилища.
 
 ## Схема БД
 

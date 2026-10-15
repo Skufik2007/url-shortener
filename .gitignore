@@ -20,3 +20,7 @@ coverage.html
 # IDE
 .idea/
 .vscode/
+
+# Данные демо-режима (DATA_FILE) и секрет подписи токенов
+data.json
+*.secret
