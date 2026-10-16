@@ -218,6 +218,37 @@
     });
   }
 
+  // ---- фильтр доменной зоны: .ru, .com, .su, .рф ----
+  var ZONES = ["ru", "com", "su", "рф"];
+  // Зона, набранная не в той раскладке: «кг» — это «ru» в русской раскладке и т. д.
+  var LAYOUT = { "кг": "ru", "сщь": "com", "ыг": "su", "ha": "рф" };
+
+  // zoneError возвращает текст ошибки, если зона похожа на .ru/.com/.su/.рф,
+  // но набрана с ошибкой. Другие зоны (.org, .de и т. п.) не проверяются.
+  function zoneError(value) {
+    var m = /^\s*(?:[a-z][a-z0-9+.-]*:\/\/)?(?:[^\/?#@\s]*@)?([^\/?#:\s]+)/i.exec(value || "");
+    if (!m) return "";
+    var host = m[1].toLowerCase().replace(/\.$/, "");
+    var dot = host.lastIndexOf(".");
+    if (dot < 0) return "";
+    var zone = host.slice(dot + 1);
+    if (ZONES.indexOf(zone) >= 0) return "";
+    var fix = guessZone(zone);
+    return fix ? "Ошибка в доменной зоне «." + zone + "» — возможно, вы имели в виду «." + fix + "»" : "";
+  }
+
+  function guessZone(zone) {
+    if (LAYOUT[zone]) return LAYOUT[zone];
+    var cleaned = zone.replace(/[^a-zа-яё]/g, "").replace(/(.)\1+/g, "$1"); // без знаков и повторов
+    var sorted = zone.split("").sort().join("");
+    for (var i = 0; i < ZONES.length; i++) {
+      var z = ZONES[i];
+      if (cleaned === z) return z;                                            // «ru+», «ruu», «comm»
+      if (zone !== "us" && sorted === z.split("").sort().join("")) return z;  // «cmo», «ur», «фр»
+    }
+    return "";
+  }
+
   function onCreate(ev) {
     ev.preventDefault();
     setMsg($("create-error"), "");
@@ -227,6 +258,8 @@
     var title = $("f-title").value.trim();
     var exp = $("f-expires").value;
     if (!payload.url) { setMsg($("create-error"), "Укажите адрес"); return; }
+    var zerr = zoneError(payload.url);
+    if (zerr) { setMsg($("create-error"), zerr); $("f-url").focus(); return; }
     if (alias) payload.alias = alias;
     if (title) payload.title = title;
     if (exp) {
@@ -453,6 +486,10 @@
     $("auth-form").addEventListener("submit", onAuthSubmit);
     $("logout").addEventListener("click", logout);
     $("create-form").addEventListener("submit", onCreate);
+    // Фильтр прямо при вводе адреса: ошибка в зоне показывается сразу.
+    $("f-url").addEventListener("input", function () {
+      setMsg($("create-error"), zoneError(this.value));
+    });
     $("refresh").addEventListener("click", loadLinks);
     $("p-apply").addEventListener("click", loadStats);
     Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (b) {
